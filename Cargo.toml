@@ -1,0 +1,20 @@
+[package]
+name = "shell-agent"
+version = "0.0.0"
+authors = ["Stephan Boyer <stephan@stephanboyer.com>"]
+edition = "2024"
+description = "A simple AI agent that only knows how to run shell commands."
+license = "MIT"
+documentation = "https://github.com/stepchowfun/shell-agent"
+homepage = "https://github.com/stepchowfun/shell-agent"
+repository = "https://github.com/stepchowfun/shell-agent"
+readme = "README.md"
+
+[lints]
+clippy.all = { level = "deny", priority = -1 }
+clippy.default_numeric_fallback = "deny"
+clippy.pedantic = { level = "deny", priority = -1 }
+rust.warnings = "deny"
+
+[dependencies]
+clap = "2"
