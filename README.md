@@ -4,6 +4,30 @@
 
 This is a simple AI agent that only knows how to run shell commands.
 
+## Usage
+
+Once Shell Agent is [installed](#installation-instructions), you can run it from the command line as follows:
+
+```sh
+OPENAI_API_KEY=... shell-agent
+```
+
+OpenAI is the only supported AI provider for now. The API key must be provided via the `OPENAI_API_KEY` environment variable.
+
+Here are the supported command-line options:
+
+```
+USAGE:
+    shell-agent [OPTIONS]
+
+FLAGS:
+    -h, --help       Prints help information
+    -v, --version    Prints version information
+
+OPTIONS:
+    -m, --model <MODEL>    Which OpenAI model to use (default: gpt-5.2)
+```
+
 ## Installation instructions
 
 ### Installation on macOS or Linux (AArch64 or x86-64)
