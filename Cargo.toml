@@ -1,6 +1,6 @@
 [package]
 name = "shell-agent"
-version = "0.0.0"
+version = "0.0.1"
 authors = ["Stephan Boyer <stephan@stephanboyer.com>"]
 edition = "2024"
 description = "A simple AI agent that only knows how to run shell commands."
@@ -19,6 +19,7 @@ rust.warnings = "deny"
 [dependencies]
 async-openai = { version = "0.33", features = ["full"] }
 clap = "2"
+colored = "2"
 futures = "0.3"
 rustyline = "17"
 serde = { version = "1", features = ["derive"] }

@@ -1,4 +1,7 @@
+mod format;
+
 use {
+    crate::format::CodeStr,
     async_openai::{
         Client,
         config::OpenAIConfig,
@@ -12,7 +15,11 @@ use {
     futures::StreamExt,
     rustyline::{DefaultEditor, error::ReadlineError},
     serde::{Deserialize, Serialize},
-    std::{error::Error, process::Command},
+    std::{
+        error::Error,
+        io::{self, IsTerminal},
+        process::Command,
+    },
 };
 
 // The program version
@@ -47,7 +54,7 @@ struct RunShellCommandFunctionResult {
 
 // Run a shell command and collect the output.
 fn run_shell_command(args: RunShellCommandFunctionArgs) -> RunShellCommandFunctionResult {
-    eprintln!("Running: {}", args.command);
+    eprintln!("Running: {}", args.command.code_str());
     match Command::new("sh").arg("-c").arg(args.command).output() {
         Ok(output) => RunShellCommandFunctionResult {
             stdout: String::from_utf8_lossy(&output.stdout).to_string(),
@@ -237,6 +244,9 @@ async fn run_turn(
 // Let the fun begin!
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
+    // Determine whether to print colored output.
+    colored::control::set_override(io::stderr().is_terminal());
+
     // Parse the command-line arguments.
     let settings = settings();
 
