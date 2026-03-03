@@ -4,12 +4,14 @@
 
 This is a simple AI agent that only knows how to run shell commands.
 
+![A screenshot of Shell Agent.](https://raw.githubusercontent.com/stepchowfun/shell-agent/main/screenshot.png)
+
 ## Usage
 
 Once Shell Agent is [installed](#installation-instructions), you can run it from the command line as follows:
 
 ```sh
-OPENAI_API_KEY=... shell-agent
+shell-agent
 ```
 
 OpenAI is the only supported AI provider for now. The API key must be provided via the `OPENAI_API_KEY` environment variable.
