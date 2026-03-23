@@ -6,8 +6,8 @@ use {
         error::OpenAIError,
         types::responses::{
             ContextManagementParam, CreateResponse, CreateResponseArgs, FunctionCallOutput,
-            FunctionCallOutputItemParam, FunctionTool, InputItem, InputParam, Item, OutputItem,
-            ResponseStreamEvent, Tool,
+            FunctionCallOutputItemParam, FunctionTool, InputContent, InputItem, InputMessage,
+            InputParam, InputRole, InputTextContent, Item, OutputItem, ResponseStreamEvent, Tool,
         },
     },
     futures::StreamExt,
@@ -60,7 +60,7 @@ async fn run_shell_command(args: RunShellCommandFunctionArgs) -> RunShellCommand
         Err(_) => RunShellCommandFunctionResult {
             stdout: String::new(),
             stderr: String::new(),
-            exit_status: 1_i32,
+            exit_status: 1,
         },
     }
 }
@@ -97,8 +97,17 @@ pub async fn run_turn(
     line: &str,
     previous_response_id: &mut Option<String>,
 ) -> Result<(), Box<dyn Error>> {
-    // Keep track of the function call outputs.
-    let mut function_call_outputs: Vec<FunctionCallOutputItemParam> = Vec::new();
+    // Keep track of items to feed into the next model request.
+    let mut items: Vec<InputItem> = vec![
+        InputMessage {
+            content: vec![InputContent::InputText(InputTextContent {
+                text: line.to_owned(),
+            })],
+            role: InputRole::User,
+            status: None,
+        }
+        .into(),
+    ];
 
     // Let the agent cook until it's done.
     loop {
@@ -109,17 +118,7 @@ pub async fn run_turn(
             .stream(true)
             .instructions(INSTRUCTIONS)
             .tools(tools())
-            .input(if function_call_outputs.is_empty() {
-                InputParam::Text(line.to_owned())
-            } else {
-                InputParam::Items(
-                    function_call_outputs
-                        .clone()
-                        .into_iter()
-                        .map(|output| InputItem::Item(Item::FunctionCallOutput(output)))
-                        .collect(),
-                )
-            });
+            .input(InputParam::Items(items.clone()));
         if let Some(ref id) = *previous_response_id {
             request_builder.previous_response_id(id);
         }
@@ -131,11 +130,12 @@ pub async fn run_turn(
             }],
         };
 
-        // Keep track of the function calls.
-        let mut function_tool_calls = Vec::new();
+        // Clear the items for the next request.
+        items.clear();
 
         // Send the request to the OpenAI API and stream the response.
         let mut stream = client.responses().create_stream_byot(request).await?;
+        let mut function_tool_calls = Vec::new();
         let mut received_output = false;
         let mut compacted = false;
         while let Some(result) = stream.next().await {
@@ -205,26 +205,55 @@ pub async fn run_turn(
         }
 
         // Handle the function calls.
-        function_call_outputs.clear();
+        let mut interrupted = false;
         for function_tool_call in function_tool_calls {
             match function_tool_call.name.as_str() {
                 "run_shell_command" => {
-                    function_call_outputs.push(FunctionCallOutputItemParam {
-                        call_id: function_tool_call.call_id,
-                        output: FunctionCallOutput::Text(serde_json::to_string(
-                            &run_shell_command(serde_json::from_str(
-                                &function_tool_call.arguments,
-                            )?)
-                            .await,
-                        )?),
-                        id: None,
-                        status: None,
-                    });
+                    let args: RunShellCommandFunctionArgs =
+                        serde_json::from_str(&function_tool_call.arguments)?;
+                    let call_id = function_tool_call.call_id;
+                    let result = tokio::select! {
+                        output = run_shell_command(args) => output,
+                        signal = tokio::signal::ctrl_c() => {
+                            if let Err(error) = signal {
+                                eprintln!("Error waiting for CTRL-C: {error}");
+                            }
+                            interrupted = true;
+                            RunShellCommandFunctionResult {
+                                stdout: String::new(),
+                                stderr: String::new(),
+                                exit_status: 130,
+                            }
+                        }
+                    };
+                    items.push(
+                        Item::FunctionCallOutput(FunctionCallOutputItemParam {
+                            call_id,
+                            output: FunctionCallOutput::Text(serde_json::to_string(&result)?),
+                            id: None,
+                            status: None,
+                        })
+                        .into(),
+                    );
                 }
                 _ => {
                     eprintln!("Unexpected function tool call: {function_tool_call:?}");
                 }
             }
+        }
+
+        // If the user interrupted any function calls, inform the model so it doesn't retry.
+        if interrupted {
+            items.push(
+                InputMessage {
+                    content: vec![InputContent::InputText(InputTextContent {
+                        text: "The user interrupted this turn with CTRL-C.".to_string(),
+                    })],
+                    role: InputRole::System,
+                    status: None,
+                }
+                .into(),
+            );
         }
     }
 
