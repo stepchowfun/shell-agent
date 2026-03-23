@@ -12,7 +12,8 @@ use {
     },
     futures::StreamExt,
     serde::{Deserialize, Serialize},
-    std::{error::Error, io::Write, process::Command},
+    std::{error::Error, io::Write, process::Stdio},
+    tokio::process::Command,
 };
 
 // Model instructions
@@ -39,9 +40,16 @@ struct CreateResponseWithContextManagement {
 }
 
 // Run a shell command and collect the output.
-fn run_shell_command(args: RunShellCommandFunctionArgs) -> RunShellCommandFunctionResult {
+async fn run_shell_command(args: RunShellCommandFunctionArgs) -> RunShellCommandFunctionResult {
     eprintln!("Running: {}", args.command.code_str());
-    match Command::new("sh").arg("-c").arg(args.command).output() {
+    let mut command = Command::new("sh");
+    command
+        .kill_on_drop(true)
+        .stdin(Stdio::null())
+        .arg("-c")
+        .arg(args.command);
+
+    match command.output().await {
         Ok(output) => RunShellCommandFunctionResult {
             stdout: String::from_utf8_lossy(&output.stdout).to_string(),
             stderr: String::from_utf8_lossy(&output.stderr).to_string(),
@@ -195,6 +203,7 @@ pub async fn run_turn(
         }
 
         // Handle the function calls.
+        function_call_outputs.clear();
         for function_tool_call in function_tool_calls {
             match function_tool_call.name.as_str() {
                 "run_shell_command" => {
@@ -203,7 +212,8 @@ pub async fn run_turn(
                         output: FunctionCallOutput::Text(serde_json::to_string(
                             &run_shell_command(serde_json::from_str(
                                 &function_tool_call.arguments,
-                            )?),
+                            )?)
+                            .await,
                         )?),
                         id: None,
                         status: None,
