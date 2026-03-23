@@ -5,8 +5,9 @@ use {
         config::OpenAIConfig,
         error::OpenAIError,
         types::responses::{
-            CreateResponseArgs, FunctionCallOutput, FunctionCallOutputItemParam, FunctionTool,
-            InputItem, InputParam, Item, OutputItem, ResponseStreamEvent, Tool,
+            ContextManagementParam, CreateResponse, CreateResponseArgs, FunctionCallOutput,
+            FunctionCallOutputItemParam, FunctionTool, InputItem, InputParam, Item, OutputItem,
+            ResponseStreamEvent, Tool,
         },
     },
     futures::StreamExt,
@@ -28,6 +29,13 @@ struct RunShellCommandFunctionResult {
     stdout: String,
     stderr: String,
     exit_status: i32,
+}
+
+#[derive(Debug, Serialize)]
+struct CreateResponseWithContextManagement {
+    #[serde(flatten)]
+    request: CreateResponse,
+    context_management: Vec<ContextManagementParam>,
 }
 
 // Run a shell command and collect the output.
@@ -104,13 +112,19 @@ pub async fn run_turn(
         if let Some(ref id) = *previous_response_id {
             request_builder.previous_response_id(id);
         }
-        let request = request_builder.build().unwrap(); // Manually verified to be safe
+        let request = CreateResponseWithContextManagement {
+            request: request_builder.build().unwrap(), // Manually verified to be safe
+            context_management: vec![ContextManagementParam {
+                type_: "compaction".to_string(),
+                compact_threshold: Some(settings.compaction_threshold),
+            }],
+        };
 
         // Keep track of the function calls.
         let mut function_tool_calls = Vec::new();
 
         // Send the request to the OpenAI API and stream the response.
-        let mut stream = client.responses().create_stream(request).await?;
+        let mut stream = client.responses().create_stream_byot(request).await?;
         let mut received_output = false;
         while let Some(result) = stream.next().await {
             match result {
@@ -144,12 +158,12 @@ pub async fn run_turn(
                                         variable.",
                         );
                     } else {
-                        eprintln!("Error: {error:?}");
+                        eprintln!("Error: {error}");
                     }
                     return Ok(());
                 }
                 Err(error) => {
-                    eprintln!("Error: {error:?}");
+                    eprintln!("Error: {error}");
                     return Ok(());
                 }
             }

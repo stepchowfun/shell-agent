@@ -15,15 +15,18 @@ use {
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 // Defaults
+const DEFAULT_COMPACTION_THRESHOLD: u32 = 100_000;
 const DEFAULT_MODEL: &str = "gpt-5.2";
+
+// Command-line argument and option names
+const COMPACTION_THRESHOLD_OPTION: &str = "compaction-threshold";
+const MODEL_OPTION: &str = "model";
 
 // This struct represents the command-line arguments.
 pub struct Settings {
+    pub compaction_threshold: u32,
     pub model: String,
 }
-
-// Command-line argument and option names
-const MODEL_OPTION: &str = "model";
 
 // Parse the command-line arguments.
 fn settings() -> Settings {
@@ -33,6 +36,16 @@ fn settings() -> Settings {
         .version_short("v")
         .author("Stephan Boyer <stephan@stephanboyer.com>")
         .about("A simple AI agent that only knows how to run shell commands.")
+        .arg(
+            Arg::with_name(COMPACTION_THRESHOLD_OPTION)
+                .value_name("TOKENS")
+                .short("c")
+                .long(COMPACTION_THRESHOLD_OPTION)
+                .help(&format!(
+                    "Compact context when it exceeds this many tokens (default: \
+                     {DEFAULT_COMPACTION_THRESHOLD})",
+                )),
+        )
         .arg(
             Arg::with_name(MODEL_OPTION)
                 .value_name("MODEL")
@@ -44,13 +57,26 @@ fn settings() -> Settings {
         )
         .get_matches();
 
+    let compaction_threshold = matches
+        .value_of(COMPACTION_THRESHOLD_OPTION)
+        .map(str::parse::<u32>)
+        .transpose()
+        .unwrap_or_else(|error| {
+            eprintln!("Invalid value for `--{COMPACTION_THRESHOLD_OPTION}`: {error}");
+            std::process::exit(2);
+        })
+        .unwrap_or(DEFAULT_COMPACTION_THRESHOLD);
+
     // Determine which model to use.
     let model = matches
         .value_of(MODEL_OPTION)
         .unwrap_or(DEFAULT_MODEL)
         .to_owned();
 
-    Settings { model }
+    Settings {
+        compaction_threshold,
+        model,
+    }
 }
 
 // Let the fun begin!
@@ -91,7 +117,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             }
             Err(error) => {
                 // There was a readline error. Just log it and continue.
-                eprintln!("Error: {error:?}");
+                eprintln!("Error: {error}");
             }
         }
     }

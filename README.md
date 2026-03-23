@@ -27,7 +27,8 @@ FLAGS:
     -v, --version    Prints version information
 
 OPTIONS:
-    -m, --model <MODEL>    Which OpenAI model to use (default: gpt-5.2)
+    -c, --compaction-threshold <TOKENS>    Compact context when it exceeds this many tokens (default: 100000)
+    -m, --model <MODEL>                    Which OpenAI model to use (default: gpt-5.2)
 ```
 
 ## Installation instructions
