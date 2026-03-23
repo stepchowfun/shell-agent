@@ -2,11 +2,13 @@ mod format;
 mod turn;
 
 use {
+    crate::format::CodeStr,
     async_openai::{Client, config::OpenAIConfig},
     clap::{App, Arg},
     rustyline::{DefaultEditor, error::ReadlineError},
     std::{
         env,
+        env::VarError,
         error::Error,
         io::{self, IsTerminal},
     },
@@ -93,7 +95,23 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let settings = settings();
 
     // Set up the OpenAI state.
-    let api_key = env::var(OPENAI_API_KEY_ENV_VAR)?;
+    let api_key = match env::var(OPENAI_API_KEY_ENV_VAR) {
+        Ok(api_key) => api_key,
+        Err(VarError::NotPresent) => {
+            eprintln!(
+                "Please set the {} environment variable.",
+                OPENAI_API_KEY_ENV_VAR.code_str(),
+            );
+            std::process::exit(2);
+        }
+        Err(VarError::NotUnicode(_)) => {
+            eprintln!(
+                "The {} environment variable contains invalid Unicode.",
+                OPENAI_API_KEY_ENV_VAR.code_str(),
+            );
+            std::process::exit(2);
+        }
+    };
     let client = Client::with_config(OpenAIConfig::new().with_api_key(api_key));
     let mut previous_response_id: Option<String> = None;
 
