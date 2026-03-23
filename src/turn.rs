@@ -68,8 +68,8 @@ async fn run_shell_command(args: RunShellCommandFunctionArgs) -> RunShellCommand
 // Set up the tools.
 fn tools() -> Vec<Tool> {
     vec![Tool::Function(FunctionTool {
-        name: "run_shell_command".to_string(),
-        description: Some("Run a shell command and return the output.".to_string()),
+        name: "run_shell_command".to_owned(),
+        description: Some("Run a shell command and return the output.".to_owned()),
         parameters: Some(serde_json::json!(
             {
                 "type": "object",
@@ -125,7 +125,7 @@ pub async fn run_turn(
         let request = CreateResponseWithContextManagement {
             request: request_builder.build().unwrap(), // Manually verified to be safe
             context_management: vec![ContextManagementParam {
-                type_: "compaction".to_string(),
+                type_: "compaction".to_owned(),
                 compact_threshold: Some(settings.compaction_threshold),
             }],
         };
@@ -170,7 +170,7 @@ pub async fn run_turn(
                     }
                 },
                 Err(OpenAIError::ApiError(error)) => {
-                    if error.code == Some("invalid_api_key".to_string()) {
+                    if error.code == Some("invalid_api_key".to_owned()) {
                         eprintln!(
                             "Invalid API key. Please set the \
                                         `OPENAI_API_KEY` environment \
@@ -247,7 +247,7 @@ pub async fn run_turn(
             items.push(
                 InputMessage {
                     content: vec![InputContent::InputText(InputTextContent {
-                        text: "The user interrupted this turn with CTRL-C.".to_string(),
+                        text: "The user interrupted this turn with CTRL-C.".to_owned(),
                     })],
                     role: InputRole::System,
                     status: None,

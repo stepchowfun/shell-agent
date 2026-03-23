@@ -116,8 +116,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 // Run a single turn of the agent.
                 turn::run_turn(&client, &settings, &line, &mut previous_response_id).await?;
             }
-            Err(ReadlineError::Interrupted | ReadlineError::Eof) => {
-                // The user wants to interrupt the loop.
+            Err(ReadlineError::Interrupted) => {
+                // The user wants to interrupt something, but nothing is happening.
+            }
+            Err(ReadlineError::Eof) => {
+                // The user wants to exit the loop.
                 break;
             }
             Err(error) => {
