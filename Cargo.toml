@@ -1,6 +1,6 @@
 [package]
 name = "shell-agent"
-version = "0.0.1"
+version = "0.0.2"
 authors = ["Stephan Boyer <stephan@stephanboyer.com>"]
 edition = "2024"
 description = "A simple AI agent that only knows how to run shell commands."
