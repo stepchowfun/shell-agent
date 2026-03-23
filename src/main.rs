@@ -2,10 +2,11 @@ mod format;
 mod turn;
 
 use {
-    async_openai::Client,
+    async_openai::{Client, config::OpenAIConfig},
     clap::{App, Arg},
     rustyline::{DefaultEditor, error::ReadlineError},
     std::{
+        env,
         error::Error,
         io::{self, IsTerminal},
     },
@@ -13,6 +14,9 @@ use {
 
 // The program version
 const VERSION: &str = env!("CARGO_PKG_VERSION");
+
+// The name of the environment variable for the OpenAI API key
+pub const OPENAI_API_KEY_ENV_VAR: &str = "OPENAI_API_KEY";
 
 // Defaults
 const DEFAULT_COMPACTION_THRESHOLD: u32 = 200_000;
@@ -89,7 +93,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let settings = settings();
 
     // Set up the OpenAI state.
-    let client = Client::new();
+    let api_key = env::var(OPENAI_API_KEY_ENV_VAR)?;
+    let client = Client::with_config(OpenAIConfig::new().with_api_key(api_key));
     let mut previous_response_id: Option<String> = None;
 
     // Set up the Rustyline state.

@@ -1,5 +1,5 @@
 use {
-    crate::{Settings, format::CodeStr},
+    crate::{OPENAI_API_KEY_ENV_VAR, Settings, format::CodeStr},
     async_openai::{
         Client,
         config::OpenAIConfig,
@@ -42,10 +42,12 @@ struct CreateResponseWithContextManagement {
 // Run a shell command and collect the output.
 async fn run_shell_command(args: RunShellCommandFunctionArgs) -> RunShellCommandFunctionResult {
     eprintln!("Running: {}", args.command.code_str());
+
     let mut command = Command::new("sh");
     command
         .kill_on_drop(true)
         .stdin(Stdio::null())
+        .env_remove(OPENAI_API_KEY_ENV_VAR)
         .arg("-c")
         .arg(args.command);
 
