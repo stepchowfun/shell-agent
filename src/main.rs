@@ -15,7 +15,7 @@ use {
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 // Defaults
-const DEFAULT_COMPACTION_THRESHOLD: u32 = 100_000;
+const DEFAULT_COMPACTION_THRESHOLD: u32 = 200_000;
 const DEFAULT_MODEL: &str = "gpt-5.2";
 
 // Command-line argument and option names

@@ -12,7 +12,7 @@ use {
     },
     futures::StreamExt,
     serde::{Deserialize, Serialize},
-    std::{error::Error, process::Command},
+    std::{error::Error, io::Write, process::Command},
 };
 
 // Model instructions
@@ -80,6 +80,7 @@ fn tools() -> Vec<Tool> {
 }
 
 // Run a single turn of the agent.
+#[allow(clippy::too_many_lines)]
 pub async fn run_turn(
     client: &Client<OpenAIConfig>,
     settings: &Settings,
@@ -126,6 +127,7 @@ pub async fn run_turn(
         // Send the request to the OpenAI API and stream the response.
         let mut stream = client.responses().create_stream_byot(request).await?;
         let mut received_output = false;
+        let mut compacted = false;
         while let Some(result) = stream.next().await {
             match result {
                 Ok(event) => match event {
@@ -137,12 +139,19 @@ pub async fn run_turn(
                     ResponseStreamEvent::ResponseOutputTextDelta(event) => {
                         // Output the response delta.
                         print!("{}", event.delta);
+                        let _ = std::io::stdout().flush();
                         received_output = true;
                     }
                     ResponseStreamEvent::ResponseCompleted(event) => {
                         for output_item in event.response.output {
-                            if let OutputItem::FunctionCall(function_tool_call) = output_item {
-                                function_tool_calls.push(function_tool_call);
+                            match output_item {
+                                OutputItem::FunctionCall(function_tool_call) => {
+                                    function_tool_calls.push(function_tool_call);
+                                }
+                                OutputItem::Compaction(_) => {
+                                    compacted = true;
+                                }
+                                _ => {}
                             }
                         }
                     }
@@ -173,6 +182,11 @@ pub async fn run_turn(
         // next prompt.
         if received_output {
             println!();
+        }
+
+        // Let the user know if a compaction occurred.
+        if compacted {
+            eprintln!("{}", "Context compacted.".code_str());
         }
 
         // If there are no function calls, break the loop.
