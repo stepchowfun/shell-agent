@@ -172,9 +172,8 @@ pub async fn run_turn(
                 Err(OpenAIError::ApiError(error)) => {
                     if error.code == Some("invalid_api_key".to_owned()) {
                         eprintln!(
-                            "Invalid API key. Please set the \
-                                        `OPENAI_API_KEY` environment \
-                                        variable.",
+                            "Invalid API key. Please update the {} environment variable.",
+                            OPENAI_API_KEY_ENV_VAR.code_str(),
                         );
                     } else {
                         eprintln!("Error: {error}");
