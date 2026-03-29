@@ -32,10 +32,14 @@ const MODEL_OPTION: &str = "model";
 
 // Model instructions
 pub const INSTRUCTIONS: &str = "You are a helpful command-line assistant named \
-    Shell Agent that can run shell commands.";
+    Shell Agent that can run shell commands. The user can quit by pressing \
+    CTRL+D. If the user asks to quit, tell them to use that shortcut.";
 
 // The welcome message from the agent
-const WELCOME_MESSAGE: &str = "Hi, I’m Shell Agent! You can press CTRL+D to quit.";
+const WELCOME_MESSAGE: &str = "Hi, I’m Shell Agent!";
+
+// The maximum size of errors to present to the model
+const MAX_ERROR_CODE_UNITS: usize = 5_000;
 
 // This struct represents the command-line arguments.
 pub struct Settings {
@@ -154,7 +158,22 @@ async fn main() -> Result<(), Box<dyn Error>> {
                         conversation = new_conversation;
                     }
                     Err(error) => {
-                        eprintln!("Error: {error}");
+                        let error_str = format!("{error}");
+                        eprintln!("Error: {error_str}");
+                        conversation.push(system_message(&format!(
+                            "I encountered the following error: {}",
+                            if error_str.len() > MAX_ERROR_CODE_UNITS {
+                                format!(
+                                    "{}…",
+                                    error_str
+                                        .chars()
+                                        .take(MAX_ERROR_CODE_UNITS - 1)
+                                        .collect::<String>(),
+                                )
+                            } else {
+                                error_str
+                            },
+                        )));
                     }
                 }
             }
