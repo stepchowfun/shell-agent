@@ -3,7 +3,6 @@ use {
     async_openai::{
         Client,
         config::OpenAIConfig,
-        error::OpenAIError,
         types::responses::{
             ContextManagementParam, CreateResponse, CreateResponseArgs, FunctionCallOutput,
             FunctionCallOutputItemParam, FunctionTool, InputContent, InputItem, InputMessage,
@@ -19,6 +18,9 @@ use {
 // Model instructions
 const INSTRUCTIONS: &str = "You are a helpful assistant that can run shell \
     commands.";
+
+// Tools
+const RUN_SHELL_COMMAND_TOOL: &str = "run_shell_command";
 
 #[derive(Debug, Deserialize)]
 struct RunShellCommandFunctionArgs {
@@ -68,7 +70,7 @@ async fn run_shell_command(args: RunShellCommandFunctionArgs) -> RunShellCommand
 // Set up the tools.
 fn tools() -> Vec<Tool> {
     vec![Tool::Function(FunctionTool {
-        name: "run_shell_command".to_owned(),
+        name: RUN_SHELL_COMMAND_TOOL.to_owned(),
         description: Some("Run a shell command and return the output.".to_owned()),
         parameters: Some(serde_json::json!(
             {
@@ -95,8 +97,9 @@ pub async fn run_turn(
     client: &Client<OpenAIConfig>,
     settings: &Settings,
     line: &str,
-    previous_response_id: &mut Option<String>,
-) -> Result<(), Box<dyn Error>> {
+    mut previous_response_id: Option<String>,
+) -> Result<Option<String>, Box<dyn Error>> {
+    // Returns new `previous_response_id`
     // Keep track of items to feed into the next model request.
     let mut items: Vec<InputItem> = vec![
         InputMessage {
@@ -119,11 +122,12 @@ pub async fn run_turn(
             .instructions(INSTRUCTIONS)
             .tools(tools())
             .input(InputParam::Items(items.clone()));
-        if let Some(ref id) = *previous_response_id {
+        if let Some(ref id) = previous_response_id {
             request_builder.previous_response_id(id);
         }
         let request = CreateResponseWithContextManagement {
-            request: request_builder.build().unwrap(), // Manually verified to be safe
+            // The `unwrap` has been manually verified to be safe.
+            request: request_builder.build().unwrap(),
             context_management: vec![ContextManagementParam {
                 type_: "compaction".to_owned(),
                 compact_threshold: Some(settings.compaction_threshold),
@@ -142,9 +146,8 @@ pub async fn run_turn(
             match result {
                 Ok(event) => match event {
                     ResponseStreamEvent::ResponseCreated(event) => {
-                        // Remember the response ID for the next
-                        // request.
-                        *previous_response_id = Some(event.response.id);
+                        // Remember the response ID for the next request.
+                        previous_response_id = Some(event.response.id);
                     }
                     ResponseStreamEvent::ResponseOutputTextDelta(event) => {
                         // Output the response delta.
@@ -153,6 +156,7 @@ pub async fn run_turn(
                         received_output = true;
                     }
                     ResponseStreamEvent::ResponseCompleted(event) => {
+                        // Capture tool calls and compaction events.
                         for output_item in event.response.output {
                             match output_item {
                                 OutputItem::FunctionCall(function_tool_call) => {
@@ -169,26 +173,14 @@ pub async fn run_turn(
                         // Ignore other events.
                     }
                 },
-                Err(OpenAIError::ApiError(error)) => {
-                    if error.code == Some("invalid_api_key".to_owned()) {
-                        eprintln!(
-                            "Invalid API key. Please update the {} environment variable.",
-                            OPENAI_API_KEY_ENV_VAR.code_str(),
-                        );
-                    } else {
-                        eprintln!("Error: {error}");
-                    }
-                    return Ok(());
-                }
                 Err(error) => {
-                    eprintln!("Error: {error}");
-                    return Ok(());
+                    return Err(Box::new(error));
                 }
             }
         }
 
-        // Output a newline after the response to separate it from the
-        // next prompt.
+        // Output a newline after the response to separate it from the next
+        // prompt.
         if received_output {
             println!();
         }
@@ -206,42 +198,40 @@ pub async fn run_turn(
         // Handle the function calls.
         let mut interrupted = false;
         for function_tool_call in function_tool_calls {
-            match function_tool_call.name.as_str() {
-                "run_shell_command" => {
-                    let args: RunShellCommandFunctionArgs =
-                        serde_json::from_str(&function_tool_call.arguments)?;
-                    let call_id = function_tool_call.call_id;
-                    let result = tokio::select! {
-                        output = run_shell_command(args) => output,
-                        signal = tokio::signal::ctrl_c() => {
-                            if let Err(error) = signal {
-                                eprintln!("Error waiting for CTRL-C: {error}");
-                            }
-                            interrupted = true;
-                            RunShellCommandFunctionResult {
-                                stdout: String::new(),
-                                stderr: String::new(),
-                                exit_status: 130,
-                            }
+            if function_tool_call.name == RUN_SHELL_COMMAND_TOOL {
+                let args: RunShellCommandFunctionArgs =
+                    serde_json::from_str(&function_tool_call.arguments)?;
+                let call_id = function_tool_call.call_id;
+                let result = tokio::select! {
+                    output = run_shell_command(args) => output,
+                    signal = tokio::signal::ctrl_c() => {
+                        if let Err(error) = signal {
+                            eprintln!("Error waiting for CTRL-C: {error}");
                         }
-                    };
-                    items.push(
-                        Item::FunctionCallOutput(FunctionCallOutputItemParam {
-                            call_id,
-                            output: FunctionCallOutput::Text(serde_json::to_string(&result)?),
-                            id: None,
-                            status: None,
-                        })
-                        .into(),
-                    );
-                }
-                _ => {
-                    eprintln!("Unexpected function tool call: {function_tool_call:?}");
-                }
+                        interrupted = true;
+                        RunShellCommandFunctionResult {
+                            stdout: String::new(),
+                            stderr: String::new(),
+                            exit_status: 130,
+                        }
+                    }
+                };
+                items.push(
+                    Item::FunctionCallOutput(FunctionCallOutputItemParam {
+                        call_id,
+                        output: FunctionCallOutput::Text(serde_json::to_string(&result)?),
+                        id: None,
+                        status: None,
+                    })
+                    .into(),
+                );
+            } else {
+                eprintln!("Unexpected function tool call: {function_tool_call:?}");
             }
         }
 
-        // If the user interrupted any function calls, inform the model so it doesn't retry.
+        // If the user interrupted any function calls, inform the model so it
+        // doesn't retry.
         if interrupted {
             items.push(
                 InputMessage {
@@ -256,5 +246,6 @@ pub async fn run_turn(
         }
     }
 
-    Ok(())
+    // Return the latest previous response ID for the next turn.
+    Ok(previous_response_id)
 }
