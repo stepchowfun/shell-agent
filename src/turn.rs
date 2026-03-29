@@ -1,5 +1,5 @@
 use {
-    crate::{OPENAI_API_KEY_ENV_VAR, Settings, format::CodeStr},
+    crate::{INSTRUCTIONS, OPENAI_API_KEY_ENV_VAR, Settings, format::CodeStr},
     async_openai::{
         Client,
         config::OpenAIConfig,
@@ -14,10 +14,6 @@ use {
     std::{error::Error, io::Write, process::Stdio},
     tokio::process::Command,
 };
-
-// Model instructions
-const INSTRUCTIONS: &str = "You are a helpful assistant that can run shell \
-    commands.";
 
 // Tools
 const RUN_SHELL_COMMAND_TOOL: &str = "run_shell_command";
@@ -91,26 +87,56 @@ fn tools() -> Vec<Tool> {
     })]
 }
 
+// Construct an `InputItem` corresponding to a user message.
+pub fn user_message(text: &str) -> InputItem {
+    InputMessage {
+        content: vec![InputContent::InputText(InputTextContent {
+            text: text.to_owned(),
+        })],
+        role: InputRole::User,
+        status: None,
+    }
+    .into()
+}
+
+// Construct an `InputItem` corresponding to a system message.
+pub fn system_message(text: &str) -> InputItem {
+    InputMessage {
+        content: vec![InputContent::InputText(InputTextContent {
+            text: text.to_owned(),
+        })],
+        role: InputRole::System,
+        status: None,
+    }
+    .into()
+}
+
+// Convert an `OutputItem` into an `InputItem`.
+fn output_item_to_input_item(output_item: OutputItem) -> Result<InputItem, serde_json::Error> {
+    serde_json::from_value(serde_json::to_value(output_item)?)
+}
+
+// Remove items before compaction items in the conversation.
+fn prune_compacted_history(conversation: &mut Vec<InputItem>) {
+    if let Some(index) = conversation
+        .iter()
+        .rposition(|item| matches!(item, InputItem::Item(Item::Compaction(_))))
+        && index > 0
+    {
+        conversation.drain(..index);
+        eprintln!("{}", "Context compacted.".code_str());
+    }
+}
+
 // Run a single turn of the agent.
 #[allow(clippy::too_many_lines)]
 pub async fn run_turn(
     client: &Client<OpenAIConfig>,
     settings: &Settings,
-    line: &str,
-    mut previous_response_id: Option<String>,
-) -> Result<Option<String>, Box<dyn Error>> {
-    // Returns new `previous_response_id`
-    // Keep track of items to feed into the next model request.
-    let mut items: Vec<InputItem> = vec![
-        InputMessage {
-            content: vec![InputContent::InputText(InputTextContent {
-                text: line.to_owned(),
-            })],
-            role: InputRole::User,
-            status: None,
-        }
-        .into(),
-    ];
+    conversation: &[InputItem],
+) -> Result<Vec<InputItem>, Box<dyn Error>> {
+    // Make a local copy of the conversation so we can mutate it.
+    let mut conversation = conversation.to_vec();
 
     // Let the agent cook until it's done.
     loop {
@@ -121,10 +147,7 @@ pub async fn run_turn(
             .stream(true)
             .instructions(INSTRUCTIONS)
             .tools(tools())
-            .input(InputParam::Items(items.clone()));
-        if let Some(ref id) = previous_response_id {
-            request_builder.previous_response_id(id);
-        }
+            .input(InputParam::Items(conversation.clone()));
         let request = CreateResponseWithContextManagement {
             // The `unwrap` has been manually verified to be safe.
             request: request_builder.build().unwrap(),
@@ -134,21 +157,13 @@ pub async fn run_turn(
             }],
         };
 
-        // Clear the items for the next request.
-        items.clear();
-
         // Send the request to the OpenAI API and stream the response.
         let mut stream = client.responses().create_stream_byot(request).await?;
-        let mut function_tool_calls = Vec::new();
         let mut received_output = false;
-        let mut compacted = false;
+        let mut output_items = Vec::new();
         while let Some(result) = stream.next().await {
             match result {
                 Ok(event) => match event {
-                    ResponseStreamEvent::ResponseCreated(event) => {
-                        // Remember the response ID for the next request.
-                        previous_response_id = Some(event.response.id);
-                    }
                     ResponseStreamEvent::ResponseOutputTextDelta(event) => {
                         // Output the response delta.
                         print!("{}", event.delta);
@@ -156,18 +171,8 @@ pub async fn run_turn(
                         received_output = true;
                     }
                     ResponseStreamEvent::ResponseCompleted(event) => {
-                        // Capture tool calls and compaction events.
-                        for output_item in event.response.output {
-                            match output_item {
-                                OutputItem::FunctionCall(function_tool_call) => {
-                                    function_tool_calls.push(function_tool_call);
-                                }
-                                OutputItem::Compaction(_) => {
-                                    compacted = true;
-                                }
-                                _ => {}
-                            }
-                        }
+                        // Capture output items.
+                        output_items.extend(event.response.output);
                     }
                     _ => {
                         // Ignore other events.
@@ -185,67 +190,68 @@ pub async fn run_turn(
             println!();
         }
 
-        // Let the user know if a compaction occurred.
-        if compacted {
-            eprintln!("{}", "Context compacted.".code_str());
+        // Add the agent responses to the conversation.
+        for output_item in &output_items {
+            conversation.push(output_item_to_input_item(output_item.clone())?);
         }
 
-        // If there are no function calls, break the loop.
-        if function_tool_calls.is_empty() {
-            break;
-        }
+        // Handle compaction.
+        prune_compacted_history(&mut conversation);
 
-        // Handle the function calls.
+        // Handle the function tool calls.
+        let mut any_function_tool_calls = false;
         let mut interrupted = false;
-        for function_tool_call in function_tool_calls {
-            if function_tool_call.name == RUN_SHELL_COMMAND_TOOL {
-                let args: RunShellCommandFunctionArgs =
-                    serde_json::from_str(&function_tool_call.arguments)?;
-                let call_id = function_tool_call.call_id;
-                let result = tokio::select! {
-                    output = run_shell_command(args) => output,
-                    signal = tokio::signal::ctrl_c() => {
-                        if let Err(error) = signal {
-                            eprintln!("Error waiting for CTRL-C: {error}");
+        for output_item in output_items {
+            if let OutputItem::FunctionCall(function_tool_call) = output_item {
+                any_function_tool_calls = true;
+
+                if function_tool_call.name == RUN_SHELL_COMMAND_TOOL {
+                    let args: RunShellCommandFunctionArgs =
+                        serde_json::from_str(&function_tool_call.arguments)?;
+                    let call_id = function_tool_call.call_id;
+                    let result = tokio::select! {
+                        output = run_shell_command(args) => output,
+                        signal = tokio::signal::ctrl_c() => {
+                            if let Err(error) = signal {
+                                eprintln!("Error waiting for CTRL-C: {error}");
+                            }
+                            interrupted = true;
+                            RunShellCommandFunctionResult {
+                                stdout: String::new(),
+                                stderr: String::new(),
+                                exit_status: 130,
+                            }
                         }
-                        interrupted = true;
-                        RunShellCommandFunctionResult {
-                            stdout: String::new(),
-                            stderr: String::new(),
-                            exit_status: 130,
-                        }
-                    }
-                };
-                items.push(
-                    Item::FunctionCallOutput(FunctionCallOutputItemParam {
-                        call_id,
-                        output: FunctionCallOutput::Text(serde_json::to_string(&result)?),
-                        id: None,
-                        status: None,
-                    })
-                    .into(),
-                );
-            } else {
-                eprintln!("Unexpected function tool call: {function_tool_call:?}");
+                    };
+                    conversation.push(
+                        Item::FunctionCallOutput(FunctionCallOutputItemParam {
+                            call_id,
+                            output: FunctionCallOutput::Text(serde_json::to_string(&result)?),
+                            id: None,
+                            status: None,
+                        })
+                        .into(),
+                    );
+                } else {
+                    eprintln!("Unexpected function tool call: {function_tool_call:?}");
+                }
             }
         }
 
-        // If the user interrupted any function calls, inform the model so it
-        // doesn't retry.
+        // If there were no function tool calls, the turn is over.
+        if !any_function_tool_calls {
+            break;
+        }
+
+        // If the user interrupted any function tool calls, inform the model so
+        // it doesn't retry.
         if interrupted {
-            items.push(
-                InputMessage {
-                    content: vec![InputContent::InputText(InputTextContent {
-                        text: "The user interrupted this turn with CTRL-C.".to_owned(),
-                    })],
-                    role: InputRole::System,
-                    status: None,
-                }
-                .into(),
-            );
+            conversation.push(system_message(
+                "The user interrupted this turn with CTRL-C.",
+            ));
         }
     }
 
-    // Return the latest previous response ID for the next turn.
-    Ok(previous_response_id)
+    // Return the latest conversation state for the next turn.
+    Ok(conversation)
 }

@@ -2,13 +2,15 @@ mod format;
 mod turn;
 
 use {
-    crate::format::CodeStr,
-    async_openai::{Client, config::OpenAIConfig},
+    crate::{
+        format::CodeStr,
+        turn::{system_message, user_message},
+    },
+    async_openai::{Client, config::OpenAIConfig, types::responses::InputItem},
     clap::{App, Arg},
     rustyline::{DefaultEditor, error::ReadlineError},
     std::{
-        env,
-        env::VarError,
+        env::{self, VarError},
         error::Error,
         io::{self, IsTerminal},
     },
@@ -27,6 +29,13 @@ const DEFAULT_MODEL: &str = "gpt-5.2";
 // Command-line argument and option names
 const COMPACTION_THRESHOLD_OPTION: &str = "compaction-threshold";
 const MODEL_OPTION: &str = "model";
+
+// Model instructions
+pub const INSTRUCTIONS: &str = "You are a helpful command-line assistant named \
+    Shell Agent that can run shell commands.";
+
+// The welcome message from the agent
+const WELCOME_MESSAGE: &str = "Hi, I’m Shell Agent! You can press CTRL+D to quit.";
 
 // This struct represents the command-line arguments.
 pub struct Settings {
@@ -113,7 +122,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
         }
     };
     let client = Client::with_config(OpenAIConfig::new().with_api_key(api_key));
-    let mut previous_response_id: Option<String> = None;
+
+    // Start the conversation.
+    println!("{WELCOME_MESSAGE}");
+    let mut conversation: Vec<InputItem> = vec![system_message(WELCOME_MESSAGE)];
 
     // Set up the Rustyline state.
     let mut rustyline = DefaultEditor::new()?;
@@ -133,13 +145,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     eprintln!("Error recording message history: {error}");
                 }
 
+                // Add the user's message to the conversation.
+                conversation.push(user_message(&line));
+
                 // Run a single turn of the agent.
-                match turn::run_turn(&client, &settings, &line, previous_response_id.clone()).await
-                {
-                    Ok(new_previous_response_id_option) => {
-                        if let Some(new_previous_response_id) = new_previous_response_id_option {
-                            previous_response_id = Some(new_previous_response_id);
-                        }
+                match turn::run_turn(&client, &settings, &conversation).await {
+                    Ok(new_conversation) => {
+                        conversation = new_conversation;
                     }
                     Err(error) => {
                         eprintln!("Error: {error}");
