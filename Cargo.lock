@@ -1413,7 +1413,7 @@ dependencies = [
 
 [[package]]
 name = "shell-agent"
-version = "0.0.6"
+version = "0.0.7"
 dependencies = [
  "async-openai",
  "clap",
