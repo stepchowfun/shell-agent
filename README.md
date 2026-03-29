@@ -4,7 +4,7 @@
 
 This is a simple AI agent that only knows how to run shell commands.
 
-![A demo animation.](https://raw.githubusercontent.com/stepchowfun/shell-agent/main/demo.gif)
+![A screenshot.](https://raw.githubusercontent.com/stepchowfun/shell-agent/main/screenshot.png)
 
 ## Usage
 

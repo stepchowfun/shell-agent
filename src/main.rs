@@ -8,6 +8,7 @@ use {
     },
     async_openai::{Client, config::OpenAIConfig, types::responses::InputItem},
     clap::{App, Arg},
+    colored::{Colorize, control::SHOULD_COLORIZE},
     rustyline::{DefaultEditor, error::ReadlineError},
     std::{
         env::{self, VarError},
@@ -30,11 +31,6 @@ const DEFAULT_MODEL: &str = "gpt-5.2";
 const COMPACTION_THRESHOLD_OPTION: &str = "compaction-threshold";
 const MODEL_OPTION: &str = "model";
 
-// Model instructions
-pub const INSTRUCTIONS: &str = "You are a helpful command-line assistant named \
-    Shell Agent that can run shell commands. The user can quit by pressing \
-    CTRL+D. If the user asks to quit, tell them to use that shortcut.";
-
 // The welcome message from the agent
 const WELCOME_MESSAGE: &str = "Hi, I’m Shell Agent!";
 
@@ -45,6 +41,24 @@ const MAX_ERROR_CODE_UNITS: usize = 5_000;
 pub struct Settings {
     pub compaction_threshold: u32,
     pub model: String,
+}
+
+// Get instructions for the model.
+/// # Errors
+///
+/// Will return `Err` if there was a problem identifying the current directory.
+pub fn get_instructions() -> Result<String, io::Error> {
+    Ok(format!(
+        "You are a helpful command-line assistant named Shell Agent that can \
+run shell commands.
+
+The operating system is `{}`. The current directory is `{}`.
+
+The user can quit by pressing CTRL+D. If the user asks to quit, \
+inform them about that shortcut.",
+        std::env::consts::OS,
+        std::env::current_dir()?.display(),
+    ))
 }
 
 // Parse the command-line arguments.
@@ -127,17 +141,24 @@ async fn main() -> Result<(), Box<dyn Error>> {
     };
     let client = Client::with_config(OpenAIConfig::new().with_api_key(api_key));
 
+    // Set up the Rustyline state.
+    let mut rustyline = DefaultEditor::new()?;
+
     // Start the conversation.
     println!("{WELCOME_MESSAGE}");
     let mut conversation: Vec<InputItem> = vec![system_message(WELCOME_MESSAGE)];
 
-    // Set up the Rustyline state.
-    let mut rustyline = DefaultEditor::new()?;
-
     // The main agent loop!
     loop {
+        // Add a blank line before the prompt for readability.
+        println!();
+
         // Read a line from the user.
-        match rustyline.readline("❯ ") {
+        match rustyline.readline(&if SHOULD_COLORIZE.should_colorize() {
+            format!("{}", "❯ ".yellow())
+        } else {
+            "❯ ".to_owned()
+        }) {
             Ok(line) => {
                 // Ignore empty lines.
                 if line.trim().is_empty() {

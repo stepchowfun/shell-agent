@@ -1,5 +1,5 @@
 use {
-    crate::{INSTRUCTIONS, OPENAI_API_KEY_ENV_VAR, Settings, format::CodeStr},
+    crate::{OPENAI_API_KEY_ENV_VAR, Settings, format::CodeStr, get_instructions},
     async_openai::{
         Client,
         config::OpenAIConfig,
@@ -145,7 +145,7 @@ pub async fn run_turn(
         request_builder
             .model(settings.model.clone())
             .stream(true)
-            .instructions(INSTRUCTIONS)
+            .instructions(get_instructions()?)
             .tools(tools())
             .input(InputParam::Items(conversation.clone()));
         let request = CreateResponseWithContextManagement {
