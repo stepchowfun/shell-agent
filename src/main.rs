@@ -129,13 +129,26 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 }
 
                 // Remember the user's input in case they want it later.
-                rustyline.add_history_entry(line.as_str())?;
+                if let Err(error) = rustyline.add_history_entry(line.as_str()) {
+                    eprintln!("Error recording message history: {error}");
+                }
 
                 // Run a single turn of the agent.
-                turn::run_turn(&client, &settings, &line, &mut previous_response_id).await?;
+                match turn::run_turn(&client, &settings, &line, previous_response_id.clone()).await
+                {
+                    Ok(new_previous_response_id_option) => {
+                        if let Some(new_previous_response_id) = new_previous_response_id_option {
+                            previous_response_id = Some(new_previous_response_id);
+                        }
+                    }
+                    Err(error) => {
+                        eprintln!("Error: {error}");
+                    }
+                }
             }
             Err(ReadlineError::Interrupted) => {
-                // The user wants to interrupt something, but nothing is happening.
+                // The user wants to interrupt something, but nothing is
+                // happening.
             }
             Err(ReadlineError::Eof) => {
                 // The user wants to exit the loop.
@@ -143,7 +156,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             }
             Err(error) => {
                 // There was a readline error. Just log it and continue.
-                eprintln!("Error: {error}");
+                eprintln!("Error reading message: {error}");
             }
         }
     }
