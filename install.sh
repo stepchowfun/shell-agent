@@ -14,7 +14,7 @@
   DESTINATION="${PREFIX:-/usr/local/bin}/shell-agent"
 
   # Which version to download
-  RELEASE="v${VERSION:-0.0.7}"
+  RELEASE="v${VERSION:-0.0.8}"
 
   # Determine which binary to download.
   FILENAME=''
