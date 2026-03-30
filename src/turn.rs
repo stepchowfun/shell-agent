@@ -68,6 +68,7 @@ fn tools() -> Vec<Tool> {
     vec![Tool::Function(FunctionTool {
         name: RUN_SHELL_COMMAND_TOOL.to_owned(),
         description: Some("Run a shell command and return the output.".to_owned()),
+        defer_loading: None,
         parameters: Some(serde_json::json!(
             {
                 "type": "object",

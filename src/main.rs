@@ -7,7 +7,7 @@ use {
         turn::{system_message, user_message},
     },
     async_openai::{Client, config::OpenAIConfig, types::responses::InputItem},
-    clap::{App, Arg},
+    clap::{Arg, ArgAction, Command},
     colored::{Colorize, control::SHOULD_COLORIZE},
     rustyline::{DefaultEditor, error::ReadlineError},
     std::{
@@ -64,35 +64,42 @@ inform them about that shortcut.",
 // Parse the command-line arguments.
 fn settings() -> Settings {
     // Set up the command-line interface.
-    let matches = App::new("Shell Agent")
+    let matches = Command::new("Shell Agent")
         .version(VERSION)
-        .version_short("v")
         .author("Stephan Boyer <stephan@stephanboyer.com>")
         .about("A simple AI agent that only knows how to run shell commands.")
+        .disable_version_flag(true)
         .arg(
-            Arg::with_name(COMPACTION_THRESHOLD_OPTION)
+            Arg::new("version")
+                .short('v')
+                .long("version")
+                .help("Print version information")
+                .action(ArgAction::Version),
+        )
+        .arg(
+            Arg::new(COMPACTION_THRESHOLD_OPTION)
                 .value_name("TOKENS")
-                .short("c")
+                .short('c')
                 .long(COMPACTION_THRESHOLD_OPTION)
-                .help(&format!(
+                .help(format!(
                     "Compact context when it exceeds this many tokens (default: \
                      {DEFAULT_COMPACTION_THRESHOLD})",
                 )),
         )
         .arg(
-            Arg::with_name(MODEL_OPTION)
+            Arg::new(MODEL_OPTION)
                 .value_name("MODEL")
-                .short("m")
+                .short('m')
                 .long(MODEL_OPTION)
-                .help(&format!(
+                .help(format!(
                     "Which OpenAI model to use (default: {DEFAULT_MODEL})",
                 )),
         )
         .get_matches();
 
     let compaction_threshold = matches
-        .value_of(COMPACTION_THRESHOLD_OPTION)
-        .map(str::parse::<u32>)
+        .get_one::<String>(COMPACTION_THRESHOLD_OPTION)
+        .map(|value| value.parse::<u32>())
         .transpose()
         .unwrap_or_else(|error| {
             eprintln!("Invalid value for `--{COMPACTION_THRESHOLD_OPTION}`: {error}");
@@ -102,8 +109,8 @@ fn settings() -> Settings {
 
     // Determine which model to use.
     let model = matches
-        .value_of(MODEL_OPTION)
-        .unwrap_or(DEFAULT_MODEL)
+        .get_one::<String>(MODEL_OPTION)
+        .map_or(DEFAULT_MODEL, String::as_str)
         .to_owned();
 
     Settings {
