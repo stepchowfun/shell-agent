@@ -7,7 +7,7 @@ use {
         turn::{system_message, user_message},
     },
     async_openai::{Client, config::OpenAIConfig, types::responses::InputItem},
-    clap::{Arg, ArgAction, Command},
+    clap::{ArgAction, Parser},
     colored::{Colorize, control::SHOULD_COLORIZE},
     rustyline::{DefaultEditor, error::ReadlineError},
     std::{
@@ -17,19 +17,12 @@ use {
     },
 };
 
-// The program version
-const VERSION: &str = env!("CARGO_PKG_VERSION");
-
 // The name of the environment variable for the OpenAI API key
 pub const OPENAI_API_KEY_ENV_VAR: &str = "OPENAI_API_KEY";
 
 // Defaults
 const DEFAULT_COMPACTION_THRESHOLD: u32 = 200_000;
 const DEFAULT_MODEL: &str = "gpt-5.2";
-
-// Command-line argument and option names
-const COMPACTION_THRESHOLD_OPTION: &str = "compaction-threshold";
-const MODEL_OPTION: &str = "model";
 
 // The welcome message from the agent
 const WELCOME_MESSAGE: &str = "Hi, I’m Shell Agent!";
@@ -38,9 +31,32 @@ const WELCOME_MESSAGE: &str = "Hi, I’m Shell Agent!";
 const MAX_ERROR_CODE_UNITS: usize = 5_000;
 
 // This struct represents the command-line arguments.
-pub struct Settings {
-    pub compaction_threshold: u32,
-    pub model: String,
+#[derive(Parser)]
+#[command(
+    about = concat!(
+        env!("CARGO_PKG_DESCRIPTION"),
+        "\n\n",
+        "More information can be found at: ",
+        env!("CARGO_PKG_HOMEPAGE")
+    ),
+    version,
+    disable_version_flag = true
+)]
+struct Cli {
+    #[arg(short, long, help = "Print version", action = ArgAction::Version)]
+    _version: Option<bool>,
+
+    #[arg(
+        short,
+        long,
+        value_name = "TOKENS",
+        help = "Compact context when it exceeds this many tokens",
+        default_value_t = DEFAULT_COMPACTION_THRESHOLD
+    )]
+    compaction_threshold: u32,
+
+    #[arg(short, long, help = "Which OpenAI model to use", default_value = DEFAULT_MODEL)]
+    model: String,
 }
 
 // Get instructions for the model.
@@ -61,64 +77,6 @@ inform them about that shortcut.",
     ))
 }
 
-// Parse the command-line arguments.
-fn settings() -> Settings {
-    // Set up the command-line interface.
-    let matches = Command::new("Shell Agent")
-        .version(VERSION)
-        .author("Stephan Boyer <stephan@stephanboyer.com>")
-        .about("A simple AI agent that only knows how to run shell commands.")
-        .disable_version_flag(true)
-        .arg(
-            Arg::new("version")
-                .short('v')
-                .long("version")
-                .help("Print version information")
-                .action(ArgAction::Version),
-        )
-        .arg(
-            Arg::new(COMPACTION_THRESHOLD_OPTION)
-                .value_name("TOKENS")
-                .short('c')
-                .long(COMPACTION_THRESHOLD_OPTION)
-                .help(format!(
-                    "Compact context when it exceeds this many tokens (default: \
-                     {DEFAULT_COMPACTION_THRESHOLD})",
-                )),
-        )
-        .arg(
-            Arg::new(MODEL_OPTION)
-                .value_name("MODEL")
-                .short('m')
-                .long(MODEL_OPTION)
-                .help(format!(
-                    "Which OpenAI model to use (default: {DEFAULT_MODEL})",
-                )),
-        )
-        .get_matches();
-
-    let compaction_threshold = matches
-        .get_one::<String>(COMPACTION_THRESHOLD_OPTION)
-        .map(|value| value.parse::<u32>())
-        .transpose()
-        .unwrap_or_else(|error| {
-            eprintln!("Invalid value for `--{COMPACTION_THRESHOLD_OPTION}`: {error}");
-            std::process::exit(2);
-        })
-        .unwrap_or(DEFAULT_COMPACTION_THRESHOLD);
-
-    // Determine which model to use.
-    let model = matches
-        .get_one::<String>(MODEL_OPTION)
-        .map_or(DEFAULT_MODEL, String::as_str)
-        .to_owned();
-
-    Settings {
-        compaction_threshold,
-        model,
-    }
-}
-
 // Let the fun begin!
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -126,7 +84,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     colored::control::set_override(io::stderr().is_terminal());
 
     // Parse the command-line arguments.
-    let settings = settings();
+    let cli = Cli::parse();
 
     // Set up the OpenAI state.
     let api_key = match env::var(OPENAI_API_KEY_ENV_VAR) {
@@ -181,7 +139,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 conversation.push(user_message(&line));
 
                 // Run a single turn of the agent.
-                match turn::run_turn(&client, &settings, &conversation).await {
+                match turn::run_turn(&client, &cli, &conversation).await {
                     Ok(new_conversation) => {
                         conversation = new_conversation;
                     }
@@ -222,4 +180,15 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     // The loop was interrupted.
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Cli;
+    use clap::CommandFactory;
+
+    #[test]
+    fn verify_cli() {
+        Cli::command().debug_assert();
+    }
 }

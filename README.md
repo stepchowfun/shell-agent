@@ -22,9 +22,9 @@ Here are the supported command-line options:
 Usage: shell-agent [OPTIONS]
 
 Options:
-  -v, --version                        Print version information
-  -c, --compaction-threshold <TOKENS>  Compact context when it exceeds this many tokens (default: 200000)
-  -m, --model <MODEL>                  Which OpenAI model to use (default: gpt-5.2)
+  -v, --version                        Print version
+  -c, --compaction-threshold <TOKENS>  Compact context when it exceeds this many tokens [default: 200000]
+  -m, --model <MODEL>                  Which OpenAI model to use [default: gpt-5.2]
   -h, --help                           Print help
 ```
 

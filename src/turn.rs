@@ -1,5 +1,5 @@
 use {
-    crate::{OPENAI_API_KEY_ENV_VAR, Settings, format::CodeStr, get_instructions},
+    crate::{Cli, OPENAI_API_KEY_ENV_VAR, format::CodeStr, get_instructions},
     async_openai::{
         Client,
         config::OpenAIConfig,
@@ -133,7 +133,7 @@ fn prune_compacted_history(conversation: &mut Vec<InputItem>) {
 #[allow(clippy::too_many_lines)]
 pub async fn run_turn(
     client: &Client<OpenAIConfig>,
-    settings: &Settings,
+    settings: &Cli,
     conversation: &[InputItem],
 ) -> Result<Vec<InputItem>, Box<dyn Error>> {
     // Make a local copy of the conversation so we can mutate it.
