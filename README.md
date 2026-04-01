@@ -19,16 +19,13 @@ OpenAI is the only supported AI provider for now. The API key must be provided v
 Here are the supported command-line options:
 
 ```
-USAGE:
-    shell-agent [OPTIONS]
+Usage: shell-agent [OPTIONS]
 
-FLAGS:
-    -h, --help       Prints help information
-    -v, --version    Prints version information
-
-OPTIONS:
-    -c, --compaction-threshold <TOKENS>    Compact context when it exceeds this many tokens (default: 200000)
-    -m, --model <MODEL>                    Which OpenAI model to use (default: gpt-5.2)
+Options:
+  -v, --version                        Print version information
+  -c, --compaction-threshold <TOKENS>  Compact context when it exceeds this many tokens (default: 200000)
+  -m, --model <MODEL>                  Which OpenAI model to use (default: gpt-5.2)
+  -h, --help                           Print help
 ```
 
 ## Installation instructions
