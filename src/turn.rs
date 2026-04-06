@@ -1,19 +1,17 @@
-use {
-    crate::{Cli, OPENAI_API_KEY_ENV_VAR, format::CodeStr, get_instructions},
-    async_openai::{
-        Client,
-        config::OpenAIConfig,
-        types::responses::{
-            ContextManagementParam, CreateResponse, CreateResponseArgs, FunctionCallOutput,
-            FunctionCallOutputItemParam, FunctionTool, InputContent, InputItem, InputMessage,
-            InputParam, InputRole, InputTextContent, Item, OutputItem, ResponseStreamEvent, Tool,
-        },
+use crate::{Cli, OPENAI_API_KEY_ENV_VAR, format::CodeStr, get_instructions};
+use async_openai::{
+    Client,
+    config::OpenAIConfig,
+    types::responses::{
+        ContextManagementParam, CreateResponse, CreateResponseArgs, FunctionCallOutput,
+        FunctionCallOutputItemParam, FunctionTool, InputContent, InputItem, InputMessage,
+        InputParam, InputRole, InputTextContent, Item, OutputItem, ResponseStreamEvent, Tool,
     },
-    futures::StreamExt,
-    serde::{Deserialize, Serialize},
-    std::{error::Error, io::Write, process::Stdio},
-    tokio::process::Command,
 };
+use futures::StreamExt;
+use serde::{Deserialize, Serialize};
+use std::{error::Error, io::Write, process::Stdio};
+use tokio::process::Command;
 
 // Tools
 const RUN_SHELL_COMMAND_TOOL: &str = "run_shell_command";
