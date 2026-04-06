@@ -1,20 +1,18 @@
 mod format;
 mod turn;
 
-use {
-    crate::{
-        format::CodeStr,
-        turn::{system_message, user_message},
-    },
-    async_openai::{Client, config::OpenAIConfig, types::responses::InputItem},
-    clap::{ArgAction, Parser},
-    colored::{Colorize, control::SHOULD_COLORIZE},
-    rustyline::{DefaultEditor, error::ReadlineError},
-    std::{
-        env::{self, VarError},
-        error::Error,
-        io::{self, IsTerminal},
-    },
+use crate::{
+    format::CodeStr,
+    turn::{system_message, user_message},
+};
+use async_openai::{Client, config::OpenAIConfig, types::responses::InputItem};
+use clap::{ArgAction, Parser};
+use colored::{Colorize, control::SHOULD_COLORIZE};
+use rustyline::{DefaultEditor, error::ReadlineError};
+use std::{
+    env::{self, VarError},
+    error::Error,
+    io::{self, IsTerminal},
 };
 
 // The name of the environment variable for the OpenAI API key
