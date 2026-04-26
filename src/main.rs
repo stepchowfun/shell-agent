@@ -84,6 +84,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // Parse the command-line arguments.
     let cli = Cli::parse();
 
+    // `reqwest` is configured with `rustls-no-provider`, so we must select a
+    // crypto provider before making any HTTPS requests.
+    rustls::crypto::ring::default_provider()
+        .install_default()
+        .map_err(|_| io::Error::other("Failed to install the default rustls crypto provider."))?;
+
     // Set up the OpenAI state.
     let api_key = match env::var(OPENAI_API_KEY_ENV_VAR) {
         Ok(api_key) => api_key,
