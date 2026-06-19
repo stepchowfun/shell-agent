@@ -17,7 +17,7 @@ clippy.pedantic = { level = "deny", priority = -1 }
 rust.warnings = "deny"
 
 [dependencies]
-async-openai = { version = "0.36", default-features = false, features = ["full"] }
+async-openai = { version = "0.41", default-features = false, features = ["full"] }
 clap = { version = "4", features = ["derive"] }
 colored = "3"
 futures = "0.3"
