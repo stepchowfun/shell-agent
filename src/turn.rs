@@ -110,11 +110,6 @@ pub fn system_message(text: &str) -> InputItem {
     .into()
 }
 
-// Convert an `OutputItem` into an `InputItem`.
-fn output_item_to_input_item(output_item: OutputItem) -> Result<InputItem, serde_json::Error> {
-    serde_json::from_value(serde_json::to_value(output_item)?)
-}
-
 // Remove items before compaction items in the conversation.
 fn prune_compacted_history(conversation: &mut Vec<InputItem>) {
     if let Some(index) = conversation
@@ -191,7 +186,7 @@ pub async fn run_turn(
 
         // Add the agent responses to the conversation.
         for output_item in &output_items {
-            conversation.push(output_item_to_input_item(output_item.clone())?);
+            conversation.push(output_item.clone().into());
         }
 
         // Handle compaction.
