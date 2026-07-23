@@ -22,7 +22,7 @@ async-openai = { version = "0.41.1", default-features = false, features = [
     "responses",
     "rustls-no-provider",
 ] }
-clap = { version = "4.6.3", features = ["derive"] }
+clap = { version = "4.6.4", features = ["derive"] }
 colored = "3.1.1"
 futures = "0.3.33"
 rustls = { version = "0.23.42", default-features = false, features = ["ring"] }
