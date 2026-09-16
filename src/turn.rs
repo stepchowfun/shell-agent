@@ -5,8 +5,8 @@ use async_openai::{
     types::responses::{
         ContextManagementParam, ContextManagementParamType, CreateResponse, CreateResponseArgs,
         FunctionCallOutput, FunctionCallOutputItemParam, FunctionTool, InputContent, InputItem,
-        InputMessage, InputParam, InputRole, InputTextContent, Item, OutputItem, ResponseStreamEvent,
-        Tool,
+        InputMessage, InputParam, InputRole, InputTextContent, Item, OutputItem,
+        ResponseStreamEvent, Tool,
     },
 };
 use futures::StreamExt;
