@@ -3,9 +3,10 @@ use async_openai::{
     Client,
     config::OpenAIConfig,
     types::responses::{
-        ContextManagementParam, CreateResponse, CreateResponseArgs, FunctionCallOutput,
-        FunctionCallOutputItemParam, FunctionTool, InputContent, InputItem, InputMessage,
-        InputParam, InputRole, InputTextContent, Item, OutputItem, ResponseStreamEvent, Tool,
+        ContextManagementParam, ContextManagementParamType, CreateResponse, CreateResponseArgs,
+        FunctionCallOutput, FunctionCallOutputItemParam, FunctionTool, InputContent, InputItem,
+        InputMessage, InputParam, InputRole, InputTextContent, Item, OutputItem,
+        ResponseStreamEvent, Tool,
     },
 };
 use futures::StreamExt;
@@ -83,6 +84,9 @@ fn tools() -> Vec<Tool> {
             }
         )),
         strict: None,
+        r#async: None,
+        output_schema: None,
+        allowed_callers: None,
     })]
 }
 
@@ -91,6 +95,7 @@ pub fn user_message(text: &str) -> InputItem {
     InputMessage {
         content: vec![InputContent::InputText(InputTextContent {
             text: text.to_owned(),
+            prompt_cache_breakpoint: None,
         })],
         role: InputRole::User,
         status: None,
@@ -103,6 +108,7 @@ pub fn system_message(text: &str) -> InputItem {
     InputMessage {
         content: vec![InputContent::InputText(InputTextContent {
             text: text.to_owned(),
+            prompt_cache_breakpoint: None,
         })],
         role: InputRole::System,
         status: None,
@@ -146,7 +152,7 @@ pub async fn run_turn(
             // The `unwrap` has been manually verified to be safe.
             request: request_builder.build().unwrap(),
             context_management: vec![ContextManagementParam {
-                type_: "compaction".to_owned(),
+                r#type: ContextManagementParamType::Compaction,
                 compact_threshold: Some(settings.compaction_threshold),
             }],
         };
@@ -219,10 +225,13 @@ pub async fn run_turn(
                     };
                     conversation.push(
                         Item::FunctionCallOutput(FunctionCallOutputItemParam {
-                            call_id,
+                            call_id: Some(call_id),
                             output: FunctionCallOutput::Text(serde_json::to_string(&result)?),
                             id: None,
                             status: None,
+                            name: None,
+                            namespace: None,
+                            caller: None,
                         })
                         .into(),
                     );
