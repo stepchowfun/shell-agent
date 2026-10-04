@@ -38,6 +38,7 @@ const MAX_ERROR_CODE_UNITS: usize = 5_000;
         env!("CARGO_PKG_HOMEPAGE")
     ),
     version,
+    display_name = "Shell Agent",
     disable_version_flag = true
 )]
 struct Cli {
