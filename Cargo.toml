@@ -17,7 +17,7 @@ clippy.pedantic = { level = "deny", priority = -1 }
 rust.warnings = "deny"
 
 [dependencies]
-async-openai = { version = "0.42.1", default-features = false, features = [
+async-openai = { version = "0.42.2", default-features = false, features = [
     "byot",
     "responses",
     "rustls-no-provider",
@@ -25,8 +25,8 @@ async-openai = { version = "0.42.1", default-features = false, features = [
 clap = { version = "4.6.7", features = ["derive"] }
 colored = "3.1.1"
 futures = "0.3.34"
-rustls = { version = "0.23.45", default-features = false, features = ["ring"] }
+rustls = { version = "0.23.46", default-features = false, features = ["ring"] }
 rustyline = "18.0.1"
 serde = { version = "1.0.229", features = ["derive"] }
-serde_json = "1.0.151"
-tokio = { version = "1.53.1", features = ["macros", "process", "rt-multi-thread", "signal"] }
+serde_json = "1.0.154"
+tokio = { version = "1.53.3", features = ["macros", "process", "rt-multi-thread", "signal"] }
