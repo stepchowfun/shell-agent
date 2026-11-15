@@ -6,7 +6,6 @@ edition = "2024"
 description = "A simple AI agent that only knows how to run shell commands."
 license = "MIT"
 documentation = "https://github.com/stepchowfun/shell-agent"
-homepage = "https://github.com/stepchowfun/shell-agent"
 repository = "https://github.com/stepchowfun/shell-agent"
 readme = "README.md"
 

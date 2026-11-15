@@ -35,7 +35,7 @@ const MAX_ERROR_CODE_UNITS: usize = 5_000;
         env!("CARGO_PKG_DESCRIPTION"),
         "\n\n",
         "More information can be found at: ",
-        env!("CARGO_PKG_HOMEPAGE")
+        env!("CARGO_PKG_REPOSITORY")
     ),
     version,
     display_name = "Shell Agent",
