@@ -129,7 +129,6 @@ fn prune_compacted_history(conversation: &mut Vec<InputItem>) {
 }
 
 // Run a single turn of the agent.
-#[allow(clippy::too_many_lines)]
 pub async fn run_turn(
     client: &Client<OpenAIConfig>,
     settings: &Cli,
