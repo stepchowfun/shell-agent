@@ -1,26 +1,23 @@
 [package]
 name = "shell-agent"
 version = "0.1.0"
-authors = ["Stephan Boyer <stephan@stephanboyer.com>"]
 edition = "2024"
 description = "A simple AI agent that only knows how to run shell commands."
-license = "MIT"
 documentation = "https://github.com/stepchowfun/shell-agent"
-repository = "https://github.com/stepchowfun/shell-agent"
 readme = "README.md"
-
-[lints]
-clippy.all = { level = "deny", priority = -1 }
-clippy.default_numeric_fallback = "deny"
-clippy.pedantic = { level = "deny", priority = -1 }
-rust.warnings = "deny"
+repository = "https://github.com/stepchowfun/shell-agent"
+license = "MIT"
 
 [dependencies]
-async-openai = { version = "0.43.0", default-features = false, features = [
+async-openai = {
+  version = "0.43.0",
+  default-features = false,
+  features = [
     "byot",
     "responses",
     "rustls-no-provider",
-] }
+  ]
+}
 clap = { version = "4.6.8", features = ["derive"] }
 colored = "3.1.1"
 futures = "0.3.34"
@@ -29,3 +26,9 @@ rustyline = "19.0.0"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"
 tokio = { version = "1.54.1", features = ["macros", "process", "rt-multi-thread", "signal"] }
+
+[lints]
+clippy.all = { level = "deny", priority = -1 }
+clippy.default_numeric_fallback = "deny"
+clippy.pedantic = { level = "deny", priority = -1 }
+rust.warnings = "deny"
